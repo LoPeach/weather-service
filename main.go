@@ -1,67 +1,50 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"new_begin/internal/client"
 	"new_begin/internal/handler"
 	"new_begin/internal/middleware"
 	"new_begin/internal/migration"
-	"new_begin/internal/models"
-	"new_begin/internal/repository"
+	"os"
+	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 )
 
-func main() {
-	var finalResult []models.Weather
-	ctx := context.Background()
-	citiesSlice := []models.Cities{
-		{Name: "Moscow", Latitude: 55.75, Longitude: 37.61},
-		{Name: "Saratov", Latitude: 51.54, Longitude: 46.00},
-		{Name: "Vladivostok", Latitude: 43.11, Longitude: 131.93},
-	}
-
-	for _, city := range citiesSlice {
-		resp, err := client.GetWeatherByCity(ctx, city.Name)
-		if err != nil {
-			log.Printf("Ошибка запроса:%s", err)
-
-			continue
+func waitForDB(dsn string) *sqlx.DB {
+	for {
+		db, err := sqlx.Open("pgx", dsn)
+		if err == nil {
+			err = db.Ping()
+			if err == nil {
+				log.Println("✅ database is ready")
+				return db
+			}
+			db.Close()
 		}
-		finalResult = append(finalResult, resp)
 
+		log.Println("⏳ waiting for database...")
+		time.Sleep(2 * time.Second)
 	}
-	for _, fn := range finalResult {
-		fmt.Printf("В городе %s температура составляет %f градусов Цельсия\n", fn.City, fn.Temperature)
-	}
-	dsn := "postgres://weather_user:weather_pass@localhost:5432/weather_db?sslmode=disable"
+}
 
-	db, err := sqlx.Connect("postgres", dsn)
-	if err != nil {
-		log.Fatalln("Не удалось подключиться к БД:", err)
+func main() {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL not set")
 	}
+
+	log.Println("DSN =", dsn)
+
+	db := waitForDB(dsn)
 	defer db.Close()
+
 	migration.InitSchema(db)
 
-	for _, ins := range finalResult {
-		err := repository.SaveWeather(ctx, db, ins)
-		if err != nil {
-			log.Printf("Ошибка выполнения вставки для города %s: %v", ins.City, err)
-			continue
-		}
-
-	}
 	fmt.Println("Connected successfully")
-	var allWeather []models.Weather
-	allWeather, err = repository.GetAllWeather(db, ctx)
-	if err != nil {
-		log.Printf("Ошибка получения всей погоды:%v", err)
-	}
-	fmt.Println(allWeather)
 
 	mux := http.NewServeMux()
 
@@ -76,7 +59,6 @@ func main() {
 		default:
 			http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
 		}
-
 	})
 
 	server := &http.Server{
@@ -88,5 +70,4 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Ошибка сервера: %v", err)
 	}
-
 }

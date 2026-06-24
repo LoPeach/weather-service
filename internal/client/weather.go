@@ -5,15 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"new_begin/internal/models"
+	"os"
 	"time"
 )
 
-var key = "xxxxx"
+var key = os.Getenv("WEATHER_API_KEY")
 
 func GetWeatherByCity(ctx context.Context, c string) (models.Weather, error) {
-
+	if key == "" {
+		log.Fatal("WEATHER_API_KEY not set")
+	}
 	url := fmt.Sprintf("https://api.weatherapi.com/v1/current.json?q=%s&key=%s", c, key)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -72,6 +76,9 @@ func GetWeatherByCity(ctx context.Context, c string) (models.Weather, error) {
 
 }
 func GetWeatherByCoordinates(ctx context.Context, lat float64, lon float64) (models.Weather, error) {
+	if key == "" {
+		log.Fatal("WEATHER_API_KEY not set")
+	}
 	url := fmt.Sprintf(
 		"https://api.weatherapi.com/v1/current.json?q=%.2f,%.2f&key=%s",
 		lat,
