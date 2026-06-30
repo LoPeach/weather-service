@@ -44,4 +44,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
-        run: docker build -t weather-service .
+        run: |
+          docker build \
+            -t ghcr.io/${{ github.repository }}:latest \
+            .
