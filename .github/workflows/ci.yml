@@ -46,6 +46,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/lopeach/weather-service:latest
+
       - name: Build Docker image
         run: |
           docker build \
